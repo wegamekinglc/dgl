@@ -19,7 +19,8 @@ import traceback
 import sklearn.linear_model as lm
 import sklearn.metrics as skm
 
-from utils import thread_wrapped_func
+from examples.pytorch.graphsage.utils import thread_wrapped_func
+
 
 class NegativeSampler(object):
     def __init__(self, g, k, neg_share=False):
@@ -34,9 +35,10 @@ class NegativeSampler(object):
             dst = self.weights.multinomial(n, replacement=True)
             dst = dst.view(-1, 1, self.k).expand(-1, self.k, -1).flatten()
         else:
-            dst = self.weights.multinomial(n*self.k, replacement=True)
+            dst = self.weights.multinomial(n * self.k, replacement=True)
         src = src.repeat_interleave(self.k)
         return src, dst
+
 
 def load_subtensor(g, input_nodes, device):
     """
@@ -44,6 +46,7 @@ def load_subtensor(g, input_nodes, device):
     """
     batch_inputs = g.ndata['features'][input_nodes].to(device)
     return batch_inputs
+
 
 class SAGE(nn.Module):
     def __init__(self,
@@ -116,6 +119,7 @@ class SAGE(nn.Module):
             x = y
         return y
 
+
 class CrossEntropyLoss(nn.Module):
     def forward(self, block_outputs, pos_graph, neg_graph):
         with pos_graph.local_scope():
@@ -131,6 +135,7 @@ class CrossEntropyLoss(nn.Module):
         label = th.cat([th.ones_like(pos_score), th.zeros_like(neg_score)]).long()
         loss = F.binary_cross_entropy_with_logits(score, label.float())
         return loss
+
 
 def compute_acc(emb, labels, train_nids, val_nids, test_nids):
     """
@@ -155,6 +160,7 @@ def compute_acc(emb, labels, train_nids, val_nids, test_nids):
     f1_micro_test = skm.f1_score(test_labels, pred[test_nids], average='micro')
     return f1_micro_eval, f1_micro_test
 
+
 def evaluate(model, g, inputs, labels, train_nids, val_nids, test_nids, batch_size, device):
     """
     Evaluate the model on the validation set specified by ``val_mask``.
@@ -176,6 +182,7 @@ def evaluate(model, g, inputs, labels, train_nids, val_nids, test_nids, batch_si
     model.train()
     return compute_acc(pred, labels, train_nids, val_nids, test_nids)
 
+
 #### Entry point
 def run(proc_id, n_gpus, args, devices, data):
     # Unpack data
@@ -194,18 +201,18 @@ def run(proc_id, n_gpus, args, devices, data):
     val_nid = th.LongTensor(np.nonzero(val_mask)).squeeze()
     test_nid = th.LongTensor(np.nonzero(test_mask)).squeeze()
 
-    #train_nid = th.LongTensor(np.nonzero(train_mask)[0])
-    #val_nid = th.LongTensor(np.nonzero(val_mask)[0])
-    #test_nid = th.LongTensor(np.nonzero(test_mask)[0])
+    # train_nid = th.LongTensor(np.nonzero(train_mask)[0])
+    # val_nid = th.LongTensor(np.nonzero(val_mask)[0])
+    # test_nid = th.LongTensor(np.nonzero(test_mask)[0])
 
     # Create PyTorch DataLoader for constructing blocks
     n_edges = g.number_of_edges()
     train_seeds = np.arange(n_edges)
     if n_gpus > 0:
-        num_per_gpu = (train_seeds.shape[0] + n_gpus -1) // n_gpus
-        train_seeds = train_seeds[proc_id * num_per_gpu :
+        num_per_gpu = (train_seeds.shape[0] + n_gpus - 1) // n_gpus
+        train_seeds = train_seeds[proc_id * num_per_gpu:
                                   (proc_id + 1) * num_per_gpu \
-                                  if (proc_id + 1) * num_per_gpu < train_seeds.shape[0]
+                                      if (proc_id + 1) * num_per_gpu < train_seeds.shape[0]
                                   else train_seeds.shape[0]]
 
     # Create sampler
@@ -271,12 +278,15 @@ def run(proc_id, n_gpus, args, devices, data):
             iter_t.append(t - d_step)
             if step % args.log_every == 0:
                 gpu_mem_alloc = th.cuda.max_memory_allocated() / 1000000 if th.cuda.is_available() else 0
-                print('[{}]Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f}|{:.4f} | Load {:.4f}| train {:.4f} | GPU {:.1f} MiB'.format(
-                    proc_id, epoch, step, loss.item(), np.mean(iter_pos[3:]), np.mean(iter_neg[3:]), np.mean(iter_d[3:]), np.mean(iter_t[3:]), gpu_mem_alloc))
+                print(
+                    '[{}]Epoch {:05d} | Step {:05d} | Loss {:.4f} | Speed (samples/sec) {:.4f}|{:.4f} | Load {:.4f}| train {:.4f} | GPU {:.1f} MiB'.format(
+                        proc_id, epoch, step, loss.item(), np.mean(iter_pos[3:]), np.mean(iter_neg[3:]),
+                        np.mean(iter_d[3:]), np.mean(iter_t[3:]), gpu_mem_alloc))
             tic_step = time.time()
 
             if step % args.eval_every == 0 and proc_id == 0:
-                eval_acc, test_acc = evaluate(model, g, g.ndata['features'], labels, train_nid, val_nid, test_nid, args.batch_size, device)
+                eval_acc, test_acc = evaluate(model, g, g.ndata['features'], labels, train_nid, val_nid, test_nid,
+                                              args.batch_size, device)
                 print('Eval Acc {:.4f} Test Acc {:.4f}'.format(eval_acc, test_acc))
                 if eval_acc > best_eval_acc:
                     best_eval_acc = eval_acc
@@ -286,9 +296,13 @@ def run(proc_id, n_gpus, args, devices, data):
             th.distributed.barrier()
     print('Avg epoch time: {}'.format(avg / (epoch - 4)))
 
+
 def main(args, devices):
     # load reddit data
-    data = RedditDataset(self_loop=True)
+    from examples.pytorch.graphsage.extdata import ExtDataset
+
+    # data = RedditDataset(self_loop=True)
+    data = ExtDataset()
     n_classes = data.num_classes
     g = data[0]
     features = g.ndata['feat']
@@ -324,13 +338,13 @@ def main(args, devices):
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser("multi-gpu training")
     argparser.add_argument("--gpu", type=str, default='0',
-            help="GPU, can be a list of gpus for multi-gpu trianing, e.g., 0,1,2,3; -1 for CPU")
+                           help="GPU, can be a list of gpus for multi-gpu trianing, e.g., 0,1,2,3; -1 for CPU")
     argparser.add_argument('--num-epochs', type=int, default=20)
     argparser.add_argument('--num-hidden', type=int, default=16)
     argparser.add_argument('--num-layers', type=int, default=2)
     argparser.add_argument('--num-negs', type=int, default=1)
     argparser.add_argument('--neg-share', default=False, action='store_true',
-        help="sharing neg nodes for positive nodes")
+                           help="sharing neg nodes for positive nodes")
     argparser.add_argument('--fan-out', type=str, default='10,25')
     argparser.add_argument('--batch-size', type=int, default=10000)
     argparser.add_argument('--log-every', type=int, default=20)
@@ -338,7 +352,7 @@ if __name__ == '__main__':
     argparser.add_argument('--lr', type=float, default=0.003)
     argparser.add_argument('--dropout', type=float, default=0.5)
     argparser.add_argument('--num-workers', type=int, default=0,
-        help="Number of sampling processes. Use 0 for no extra process.")
+                           help="Number of sampling processes. Use 0 for no extra process.")
     args = argparser.parse_args()
 
     devices = list(map(int, args.gpu.split(',')))
