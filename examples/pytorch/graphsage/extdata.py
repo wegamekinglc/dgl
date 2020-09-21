@@ -131,9 +131,9 @@ class ExtDataset(DGLBuiltinDataset):
     >>> # Train, Validation and Test
     """
 
-    def __init__(self, raw_dir=None, force_reload=False, verbose=False):
-        _url = _get_dgl_url("dataset/ext_data{}.zip")
-        super(ExtDataset, self).__init__(name='ext_data',
+    def __init__(self, data_name, raw_dir=None, force_reload=False, verbose=False):
+        _url = _get_dgl_url(f"dataset/{data_name}.zip")
+        super(ExtDataset, self).__init__(name=data_name,
                                          url=_url,
                                          raw_dir=raw_dir,
                                          force_reload=force_reload,

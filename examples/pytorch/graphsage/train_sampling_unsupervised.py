@@ -290,6 +290,7 @@ def run(proc_id, n_gpus, args, devices, data):
                 print('Eval Acc {:.4f} Test Acc {:.4f}'.format(eval_acc, test_acc))
                 if eval_acc > best_eval_acc:
                     best_eval_acc = eval_acc
+                if test_acc > best_test_acc:
                     best_test_acc = test_acc
                 print('Best Eval Acc {:.4f} Test Acc {:.4f}'.format(best_eval_acc, best_test_acc))
         if n_gpus > 1:
@@ -302,7 +303,7 @@ def main(args, devices):
     from examples.pytorch.graphsage.extdata import ExtDataset
 
     # data = RedditDataset(self_loop=True)
-    data = ExtDataset()
+    data = ExtDataset(data_name='ext_data')
     n_classes = data.num_classes
     g = data[0]
     features = g.ndata['feat']
@@ -339,7 +340,7 @@ if __name__ == '__main__':
     argparser = argparse.ArgumentParser("multi-gpu training")
     argparser.add_argument("--gpu", type=str, default='0',
                            help="GPU, can be a list of gpus for multi-gpu trianing, e.g., 0,1,2,3; -1 for CPU")
-    argparser.add_argument('--num-epochs', type=int, default=20)
+    argparser.add_argument('--num-epochs', type=int, default=2000)
     argparser.add_argument('--num-hidden', type=int, default=16)
     argparser.add_argument('--num-layers', type=int, default=2)
     argparser.add_argument('--num-negs', type=int, default=1)
