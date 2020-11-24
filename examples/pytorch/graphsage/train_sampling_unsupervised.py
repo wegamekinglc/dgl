@@ -298,10 +298,7 @@ def run(proc_id, n_gpus, args, devices, data):
 
 def main(args, devices):
     # load reddit data
-    from examples.pytorch.graphsage.extdata import ExtDataset
-
-    # data = RedditDataset(self_loop=True)
-    data = ExtDataset(data_name='ext_data')
+    data = RedditDataset(self_loop=False)
     n_classes = data.num_classes
     g = data[0]
     features = g.ndata['feat']
